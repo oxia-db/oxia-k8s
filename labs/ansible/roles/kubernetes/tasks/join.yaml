@@ -1,0 +1,36 @@
+# Joins a control plane or a worker to the cluster of the first control plane
+- name: Check whether the node joined
+  ansible.builtin.stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: kubernetes_joined
+
+- name: Join the cluster
+  when: not kubernetes_joined.stat.exists
+  vars:
+    kubernetes_first: "{{ groups['kubernetes_control_planes'][0] }}"
+    kubernetes_control_plane: "{{ inventory_hostname in groups['kubernetes_control_planes'] }}"
+  block:
+    - name: Create a join token
+      delegate_to: "{{ kubernetes_first }}"
+      ansible.builtin.command: kubeadm token create --print-join-command --kubeconfig /etc/kubernetes/admin.conf
+      register: kubernetes_join
+      changed_when: true
+
+    # The control planes share the certificates, which kubeadm keeps encrypted
+    # in the cluster for two hours
+    - name: Upload the control plane certificates
+      when: kubernetes_control_plane
+      delegate_to: "{{ kubernetes_first }}"
+      ansible.builtin.command: kubeadm init phase upload-certs --upload-certs --config /etc/kubernetes/kubeadm.yaml
+      register: kubernetes_certs
+      changed_when: true
+
+    - name: Join the node
+      ansible.builtin.command: >-
+        {{ kubernetes_join.stdout }}
+        {% if kubernetes_control_plane %}
+        --control-plane --certificate-key {{ kubernetes_certs.stdout_lines[-1] }}
+        --apiserver-advertise-address {{ node_address }}
+        --ignore-preflight-errors ExternalEtcdVersion
+        {% endif %}
+      changed_when: true

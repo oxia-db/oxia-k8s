@@ -1,0 +1,47 @@
+- name: Create the oxia user
+  ansible.builtin.user:
+    name: oxia
+    system: true
+    shell: /usr/sbin/nologin
+    home: /var/lib/oxia
+    create_home: false
+
+- name: Create the data directory
+  ansible.builtin.file:
+    path: /var/lib/oxia
+    state: directory
+    owner: oxia
+    group: oxia
+    mode: "0750"
+
+- name: Download the Oxia release
+  when: oxia_binary | length == 0
+  block:
+    - name: Create the release directory
+      ansible.builtin.file:
+        path: /opt/oxia/{{ oxia_version }}
+        state: directory
+        mode: "0755"
+
+    - name: Unpack the release
+      ansible.builtin.unarchive:
+        src: https://github.com/oxia-db/oxia/releases/download/{{ oxia_version }}/oxia-oxia-linux-{{ oxia_arch }}.tar.gz
+        dest: /opt/oxia/{{ oxia_version }}
+        remote_src: true
+        creates: /opt/oxia/{{ oxia_version }}/bin/oxia
+
+    - name: Install the release binary
+      ansible.builtin.copy:
+        src: /opt/oxia/{{ oxia_version }}/bin/oxia
+        dest: /usr/local/bin/oxia
+        remote_src: true
+        mode: "0755"
+      notify: Restart Oxia
+
+- name: Install the local binary
+  when: oxia_binary | length > 0
+  ansible.builtin.copy:
+    src: "{{ oxia_binary }}"
+    dest: /usr/local/bin/oxia
+    mode: "0755"
+  notify: Restart Oxia

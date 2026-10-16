@@ -1,0 +1,59 @@
+# Deploys Oxia, the oxia-etcd gateways and Kubernetes with kubeadm on the
+# machines of the inventory.
+- name: Oxia
+  import_playbook: oxia.yaml
+  vars:
+    oxia_etcd_cluster: kubernetes
+
+- name: Kubernetes nodes
+  hosts: kubernetes_control_planes:kubernetes_workers
+  gather_facts: false
+  become: true
+  roles: [kubernetes]
+
+- name: First Kubernetes control plane
+  hosts: kubernetes_control_planes[0]
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Initialize the cluster
+      ansible.builtin.include_role:
+        name: kubernetes
+        tasks_from: init
+
+# One at a time, as kubeadm joins a control plane
+- name: Other Kubernetes control planes
+  hosts: kubernetes_control_planes[1:]
+  gather_facts: false
+  become: true
+  serial: 1
+  tasks:
+    - name: Join the cluster
+      ansible.builtin.include_role:
+        name: kubernetes
+        tasks_from: join
+
+- name: Kubernetes workers
+  hosts: kubernetes_workers
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Join the cluster
+      ansible.builtin.include_role:
+        name: kubernetes
+        tasks_from: join
+
+# Without workers, the pods run on the control planes, as on k3s servers
+- name: Pods on the control planes
+  hosts: kubernetes_control_planes[0]
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Remove the control plane taint
+      when: groups['kubernetes_workers'] | length == 0
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        taint nodes --all node-role.kubernetes.io/control-plane:NoSchedule-
+      register: kubernetes_taint
+      changed_when: kubernetes_taint.stdout is search('untainted')
+      failed_when: kubernetes_taint.rc != 0 and kubernetes_taint.stderr is not search('not found')

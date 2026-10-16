@@ -1,0 +1,29 @@
+# The machines, and what each one runs. A machine can be in several groups:
+# here each of the three runs a coordinator, a data server and a k3s server or a
+# Kubernetes control plane, and two of them a gateway.
+all:
+  hosts:
+    node-0: {ansible_host: 10.0.0.10}
+    node-1: {ansible_host: 10.0.0.11}
+    node-2: {ansible_host: 10.0.0.12}
+  vars:
+    ansible_user: ubuntu
+  children:
+    # Three or five, for the Raft quorum of the metadata
+    oxia_coordinators:
+      hosts: {node-0: {}, node-1: {}, node-2: {}}
+    oxia_dataservers:
+      hosts: {node-0: {}, node-1: {}, node-2: {}}
+    # One serves, the others stand by
+    oxia_etcd:
+      hosts: {node-0: {}, node-1: {}}
+    # k3s.yaml: the k3s servers and agents
+    k3s_servers:
+      hosts: {node-0: {}, node-1: {}, node-2: {}}
+    k3s_agents:
+      hosts: {}
+    # kubernetes.yaml: the kubeadm control planes and workers
+    kubernetes_control_planes:
+      hosts: {node-0: {}, node-1: {}, node-2: {}}
+    kubernetes_workers:
+      hosts: {}

@@ -1,0 +1,43 @@
+# The address the other machines reach this one at
+node_address: "{{ ansible_facts['default_ipv4']['address'] }}"
+
+# Oxia: a GitHub release, or a binary on this machine when oxia_binary is set
+oxia_version: v0.17.1
+oxia_binary: ""
+oxia_namespace: kubernetes
+oxia_namespace_shards: 3
+oxia_replication_factor: "{{ [3, groups['oxia_dataservers'] | length] | min }}"
+
+oxia_coordinator_admin_port: 6651
+oxia_coordinator_internal_port: 6650
+oxia_coordinator_raft_port: 6652
+oxia_coordinator_metrics_port: 8081
+oxia_dataserver_public_port: 6648
+oxia_dataserver_internal_port: 6649
+oxia_dataserver_metrics_port: 8080
+
+# oxia-etcd: a GitHub release, or a binary on this machine when oxia_etcd_binary is set
+oxia_etcd_version: ""
+oxia_etcd_binary: ""
+# Name of the etcd cluster in the Oxia namespace: k3s.yaml and kubernetes.yaml set it
+oxia_etcd_cluster: default
+oxia_etcd_port: 2379
+oxia_etcd_metrics_port: 8082
+
+# k3s
+k3s_version: v1.37.1+k3s1
+# The k3s servers share it; it is generated once, on this machine
+k3s_token: "{{ lookup('ansible.builtin.password', playbook_dir ~ '/credentials/k3s-token', chars=['ascii_letters', 'digits'], length=48) }}"
+# More settings of /etc/rancher/k3s/config.yaml
+k3s_server_config: {}
+k3s_agent_config: {}
+
+# Kubernetes, with kubeadm
+kubernetes_version: v1.37.1
+# The address of the API server: a load balancer in front of the control
+# planes, or else the first one
+kubernetes_control_plane_endpoint: "{{ hostvars[groups['kubernetes_control_planes'][0]].node_address }}:6443"
+kubernetes_pod_subnet: 10.244.0.0/16
+flannel_version: v0.28.10
+
+oxia_arch: "{{ {'x86_64': 'amd64', 'aarch64': 'arm64'}[ansible_facts['architecture']] }}"

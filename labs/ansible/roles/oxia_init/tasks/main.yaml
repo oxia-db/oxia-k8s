@@ -1,0 +1,11 @@
+- name: Install the init script
+  ansible.builtin.template:
+    src: oxia-init.sh.j2
+    dest: /var/lib/oxia/oxia-init.sh
+    mode: "0755"
+
+# Registers the data servers and the namespace with the coordinators
+- name: Register the data servers and the namespace
+  ansible.builtin.command: timeout 300 /var/lib/oxia/oxia-init.sh
+  register: oxia_init_result
+  changed_when: "'Created' in oxia_init_result.stdout"

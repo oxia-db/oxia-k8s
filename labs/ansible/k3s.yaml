@@ -1,0 +1,19 @@
+# Deploys Oxia, the oxia-etcd gateways and k3s on the machines of the inventory.
+- name: Oxia
+  import_playbook: oxia.yaml
+  vars:
+    oxia_etcd_cluster: k3s
+
+# One at a time: the first server initializes the cluster, the others join it
+- name: The k3s servers
+  hosts: k3s_servers
+  gather_facts: false
+  become: true
+  serial: 1
+  roles: [k3s]
+
+- name: The k3s agents
+  hosts: k3s_agents
+  gather_facts: false
+  become: true
+  roles: [k3s]

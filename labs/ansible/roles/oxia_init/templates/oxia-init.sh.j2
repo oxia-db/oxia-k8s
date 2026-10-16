@@ -1,0 +1,36 @@
+#!/bin/sh
+# {{ ansible_managed }}
+# Registers the data servers and the namespace with the coordinators. It
+# skips what exists, so that it can run again.
+set -eu
+
+admin() {
+  # The first coordinator that answers
+  for c in {% for h in groups['oxia_coordinators'] %}{{ hostvars[h].node_address }}:{{ oxia_coordinator_admin_port }} {% endfor %}; do
+    if oxia admin --admin-address "$c" "$@"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+{% for h in groups['oxia_dataservers'] %}
+until admin dataserver get {{ h }} >/dev/null 2>&1; do
+  if admin dataserver create {{ h }} \
+      --public {{ hostvars[h].node_address }}:{{ oxia_dataserver_public_port }} \
+      --internal {{ hostvars[h].node_address }}:{{ oxia_dataserver_internal_port }} >/dev/null; then
+    echo "Created the data server {{ h }}"
+  else
+    sleep 2
+  fi
+done
+{% endfor %}
+
+until admin namespace get {{ oxia_namespace }} >/dev/null 2>&1; do
+  if admin namespace create {{ oxia_namespace }} \
+      --initial-shards {{ oxia_namespace_shards }} --replication-factor {{ oxia_replication_factor }} >/dev/null; then
+    echo "Created the namespace {{ oxia_namespace }}"
+  else
+    sleep 2
+  fi
+done

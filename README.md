@@ -14,6 +14,7 @@ through the <a href="https://github.com/oxia-db/oxia-etcd">oxia-etcd</a> gateway
 | Lab | What it runs |
 |---|---|
 | [k3s](labs/k3s) | On one machine with Docker Compose: an Oxia cluster with Raft coordinators, two oxia-etcd gateways, and k3s on them |
+| [ansible](labs/ansible) | On your own machines with Ansible: the same Oxia cluster and gateways, and k3s or Kubernetes with kubeadm on them |
 
 ## Contributors
 

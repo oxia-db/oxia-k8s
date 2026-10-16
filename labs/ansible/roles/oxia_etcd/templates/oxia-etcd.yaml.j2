@@ -1,0 +1,14 @@
+# {{ ansible_managed }}
+{% set dataserver = inventory_hostname if inventory_hostname in groups['oxia_dataservers'] else groups['oxia_dataservers'][0] %}
+server:
+  bindAddress: 0.0.0.0:{{ oxia_etcd_port }}
+  advertiseClientURL: http://{{ node_address }}:{{ oxia_etcd_port }}
+  name: {{ inventory_hostname }}
+oxia:
+  # The data server on this machine, or else the first one
+  serviceAddress: {{ hostvars[dataserver].node_address }}:{{ oxia_dataserver_public_port }}
+  namespace: {{ oxia_namespace }}
+  cluster: {{ oxia_etcd_cluster }}
+observability:
+  metric:
+    bindAddress: 0.0.0.0:{{ oxia_etcd_metrics_port }}

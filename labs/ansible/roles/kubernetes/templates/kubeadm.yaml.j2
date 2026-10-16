@@ -1,0 +1,32 @@
+# {{ ansible_managed }}
+apiVersion: kubeadm.k8s.io/v1beta4
+kind: InitConfiguration
+localAPIEndpoint:
+  advertiseAddress: {{ node_address }}
+nodeRegistration:
+  # The check gets /version over HTTP from the etcd port, which the gateways
+  # serve over gRPC only
+  ignorePreflightErrors: [ExternalEtcdVersion]
+---
+apiVersion: kubeadm.k8s.io/v1beta4
+kind: ClusterConfiguration
+kubernetesVersion: {{ kubernetes_version }}
+controlPlaneEndpoint: {{ kubernetes_control_plane_endpoint }}
+networking:
+  podSubnet: {{ kubernetes_pod_subnet }}
+apiServer:
+  certSANs:
+{% for h in groups['kubernetes_control_planes'] %}
+    - {{ hostvars[h].node_address }}
+{% endfor %}
+# The oxia-etcd gateways, in place of etcd
+etcd:
+  external:
+    endpoints:
+{% for h in groups['oxia_etcd'] %}
+      - http://{{ hostvars[h].node_address }}:{{ oxia_etcd_port }}
+{% endfor %}
+---
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+cgroupDriver: systemd

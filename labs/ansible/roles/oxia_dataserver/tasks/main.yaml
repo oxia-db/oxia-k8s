@@ -1,0 +1,26 @@
+- name: Create the data server directory
+  ansible.builtin.file:
+    path: /var/lib/oxia/dataserver
+    state: directory
+    owner: oxia
+    group: oxia
+    mode: "0750"
+
+- name: Install the data server service
+  ansible.builtin.template:
+    src: oxia-dataserver.service.j2
+    dest: /etc/systemd/system/oxia-dataserver.service
+    mode: "0644"
+  notify: Restart Oxia
+
+- name: Start the data server
+  ansible.builtin.systemd_service:
+    name: oxia-dataserver
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Wait for the data server
+  ansible.builtin.wait_for:
+    port: "{{ oxia_dataserver_public_port }}"
+    timeout: 120

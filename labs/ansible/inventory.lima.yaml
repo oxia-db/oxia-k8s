@@ -1,0 +1,23 @@
+# Three Lima VMs on one machine, to try the playbook: see the README.
+all:
+  hosts:
+    oxia-0: {ansible_host: lima-oxia-0, ansible_ssh_common_args: "-F {{ lookup('env', 'HOME') }}/.lima/oxia-0/ssh.config"}
+    oxia-1: {ansible_host: lima-oxia-1, ansible_ssh_common_args: "-F {{ lookup('env', 'HOME') }}/.lima/oxia-1/ssh.config"}
+    oxia-2: {ansible_host: lima-oxia-2, ansible_ssh_common_args: "-F {{ lookup('env', 'HOME') }}/.lima/oxia-2/ssh.config"}
+  children:
+    oxia_coordinators:
+      hosts: {oxia-0: {}, oxia-1: {}, oxia-2: {}}
+    oxia_dataservers:
+      hosts: {oxia-0: {}, oxia-1: {}, oxia-2: {}}
+    oxia_etcd:
+      hosts: {oxia-0: {}, oxia-1: {}}
+    # k3s.yaml: the k3s servers and agents
+    k3s_servers:
+      hosts: {oxia-0: {}, oxia-1: {}, oxia-2: {}}
+    k3s_agents:
+      hosts: {}
+    # kubernetes.yaml: the kubeadm control planes and workers
+    kubernetes_control_planes:
+      hosts: {oxia-0: {}, oxia-1: {}, oxia-2: {}}
+    kubernetes_workers:
+      hosts: {}
