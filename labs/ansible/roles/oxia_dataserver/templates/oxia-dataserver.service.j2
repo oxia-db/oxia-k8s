@@ -1,0 +1,22 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Oxia data server
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=oxia
+Group=oxia
+WorkingDirectory=/var/lib/oxia/dataserver
+ExecStart=/usr/local/bin/oxia server \
+  --data-dir /var/lib/oxia/dataserver/db \
+  --wal-dir /var/lib/oxia/dataserver/wal \
+  --public-addr 0.0.0.0:{{ oxia_dataserver_public_port }} \
+  --internal-addr 0.0.0.0:{{ oxia_dataserver_internal_port }} \
+  --metrics-addr 0.0.0.0:{{ oxia_dataserver_metrics_port }}
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

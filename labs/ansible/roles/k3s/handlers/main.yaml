@@ -1,0 +1,4 @@
+- name: Restart k3s
+  ansible.builtin.systemd_service:
+    name: "{{ k3s_server | ternary('k3s', 'k3s-agent') }}"
+    state: restarted

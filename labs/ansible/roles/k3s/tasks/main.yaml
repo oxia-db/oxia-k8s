@@ -1,0 +1,78 @@
+- name: Choose the k3s server or agent
+  ansible.builtin.set_fact:
+    k3s_server: "{{ inventory_hostname in groups['k3s_servers'] }}"
+
+- name: Create the configuration directory
+  ansible.builtin.file:
+    path: /etc/rancher/k3s
+    state: directory
+    mode: "0755"
+
+- name: Install the configuration
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: /etc/rancher/k3s/config.yaml
+    mode: "0600"
+  notify: Restart k3s
+
+- name: Check the installed version
+  ansible.builtin.command: /usr/local/bin/k3s --version
+  register: k3s_installed
+  changed_when: false
+  failed_when: false
+
+- name: Install k3s
+  when: k3s_installed.rc != 0 or k3s_version not in k3s_installed.stdout
+  block:
+    - name: Download the install script
+      ansible.builtin.get_url:
+        url: https://get.k3s.io
+        dest: /usr/local/bin/k3s-install.sh
+        mode: "0755"
+      register: k3s_script
+      until: k3s_script is succeeded
+      retries: 5
+
+    # The script installs the binary and the service, and starts it
+    - name: Run the install script
+      ansible.builtin.command: /usr/local/bin/k3s-install.sh
+      environment:
+        INSTALL_K3S_VERSION: "{{ k3s_version }}"
+        INSTALL_K3S_EXEC: "{{ k3s_server | ternary('server', 'agent') }}"
+      changed_when: true
+
+- name: Start k3s
+  ansible.builtin.systemd_service:
+    name: "{{ k3s_server | ternary('k3s', 'k3s-agent') }}"
+    enabled: true
+    state: started
+
+- name: Wait for the API server
+  when: k3s_server
+  ansible.builtin.wait_for:
+    port: 6443
+    timeout: 300
+
+- name: Write the kubeconfig on this machine
+  when: inventory_hostname == groups['k3s_servers'][0]
+  block:
+    - name: Read the kubeconfig
+      ansible.builtin.slurp:
+        src: /etc/rancher/k3s/k3s.yaml
+      register: k3s_kubeconfig
+
+    - name: Create the output directory
+      delegate_to: localhost
+      become: false
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/output"
+        state: directory
+        mode: "0755"
+
+    - name: Save the kubeconfig to output/kubeconfig.yaml
+      delegate_to: localhost
+      become: false
+      ansible.builtin.copy:
+        content: "{{ k3s_kubeconfig.content | b64decode | replace('https://127.0.0.1:6443', 'https://' ~ node_address ~ ':6443') }}"
+        dest: "{{ playbook_dir }}/output/kubeconfig.yaml"
+        mode: "0600"

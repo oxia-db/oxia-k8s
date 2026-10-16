@@ -1,0 +1,33 @@
+# Deploys Oxia and the oxia-etcd gateways: k3s.yaml and kubernetes.yaml import it.
+- name: Gather the facts of every machine
+  hosts: all
+  tasks: []
+
+# Started together: the coordinators elect their Raft leader once a quorum runs
+- name: Oxia coordinators
+  hosts: oxia_coordinators
+  gather_facts: false
+  become: true
+  roles: [oxia_coordinator]
+
+# One at a time, so that a restart keeps the shards available
+- name: Oxia data servers
+  hosts: oxia_dataservers
+  gather_facts: false
+  become: true
+  serial: 1
+  roles: [oxia_dataserver]
+
+- name: Oxia cluster configuration
+  hosts: oxia_coordinators[0]
+  gather_facts: false
+  become: true
+  roles: [oxia_init]
+
+# One at a time, so that a standby serves while the other restarts
+- name: The oxia-etcd gateways
+  hosts: oxia_etcd
+  gather_facts: false
+  become: true
+  serial: 1
+  roles: [oxia_etcd]

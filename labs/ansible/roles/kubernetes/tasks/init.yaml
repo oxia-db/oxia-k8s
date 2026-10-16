@@ -1,0 +1,42 @@
+# Initializes the cluster on the first control plane, with the gateways as
+# its external etcd
+- name: Write the kubeadm configuration
+  ansible.builtin.template:
+    src: kubeadm.yaml.j2
+    dest: /etc/kubernetes/kubeadm.yaml
+    mode: "0600"
+
+- name: Initialize the cluster
+  ansible.builtin.command: kubeadm init --config /etc/kubernetes/kubeadm.yaml --upload-certs
+  args:
+    creates: /etc/kubernetes/admin.conf
+
+- name: Install the Flannel network
+  ansible.builtin.command: >-
+    kubectl --kubeconfig /etc/kubernetes/admin.conf apply
+    -f https://github.com/flannel-io/flannel/releases/download/{{ flannel_version }}/kube-flannel.yml
+  register: kubernetes_flannel
+  changed_when: kubernetes_flannel.stdout is search('created|configured')
+  retries: 5
+  until: kubernetes_flannel is succeeded
+
+- name: Read the kubeconfig
+  ansible.builtin.slurp:
+    src: /etc/kubernetes/admin.conf
+  register: kubernetes_kubeconfig
+
+- name: Create the output directory
+  delegate_to: localhost
+  become: false
+  ansible.builtin.file:
+    path: "{{ playbook_dir }}/output"
+    state: directory
+    mode: "0755"
+
+- name: Save the kubeconfig to output/kubeconfig.yaml
+  delegate_to: localhost
+  become: false
+  ansible.builtin.copy:
+    content: "{{ kubernetes_kubeconfig.content | b64decode }}"
+    dest: "{{ playbook_dir }}/output/kubeconfig.yaml"
+    mode: "0600"

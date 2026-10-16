@@ -1,0 +1,6 @@
+- name: Restart the coordinator
+  listen: Restart Oxia
+  ansible.builtin.systemd_service:
+    name: oxia-coordinator
+    state: restarted
+    daemon_reload: true

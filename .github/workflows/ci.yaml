@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ansible-lint:
+    name: Ansible Lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: labs/ansible
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Install Ansible
+        run: pip install ansible-core ansible-lint
+
+      - name: Check the syntax
+        run: |
+          ansible-playbook -i inventory.example.yaml --syntax-check k3s.yaml
+          ansible-playbook -i inventory.example.yaml --syntax-check kubernetes.yaml
+
+      - name: Lint
+        run: ansible-lint k3s.yaml kubernetes.yaml
+
+  compose:
+    name: Compose
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check the Compose file
+        run: docker compose -f labs/k3s/compose.yaml config --quiet

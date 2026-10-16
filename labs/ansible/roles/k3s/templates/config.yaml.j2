@@ -1,0 +1,16 @@
+# {{ ansible_managed }}
+{% if k3s_server %}
+{% set config = {
+  'token': k3s_token,
+  'datastore-endpoint': groups['oxia_etcd'] | map('extract', hostvars, 'node_address') | map('regex_replace', '^(.*)$', 'http://\\1:' ~ oxia_etcd_port) | join(','),
+  'node-ip': node_address,
+  'tls-san': groups['k3s_servers'] | map('extract', hostvars, 'node_address') | list,
+} | combine(k3s_server_config) %}
+{% else %}
+{% set config = {
+  'server': 'https://' ~ hostvars[groups['k3s_servers'][0]].node_address ~ ':6443',
+  'token': k3s_token,
+  'node-ip': node_address,
+} | combine(k3s_agent_config) %}
+{% endif %}
+{{ config | to_nice_yaml }}

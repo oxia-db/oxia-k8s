@@ -1,0 +1,24 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Oxia coordinator
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=oxia
+Group=oxia
+WorkingDirectory=/var/lib/oxia/coordinator
+ExecStart=/usr/local/bin/oxia coordinator \
+  --metadata raft \
+  --raft-address {{ node_address }}:{{ oxia_coordinator_raft_port }} \
+  --raft-bootstrap-nodes {{ groups['oxia_coordinators'] | map('extract', hostvars, 'node_address') | map('regex_replace', '$', ':' ~ oxia_coordinator_raft_port) | join(',') }} \
+  --raft-data-dir /var/lib/oxia/coordinator/raft \
+  --public-addr 0.0.0.0:{{ oxia_coordinator_admin_port }} \
+  --internal-addr 0.0.0.0:{{ oxia_coordinator_internal_port }} \
+  --metrics-addr 0.0.0.0:{{ oxia_coordinator_metrics_port }}
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

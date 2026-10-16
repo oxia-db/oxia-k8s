@@ -1,0 +1,6 @@
+- name: Restart the data server
+  listen: Restart Oxia
+  ansible.builtin.systemd_service:
+    name: oxia-dataserver
+    state: restarted
+    daemon_reload: true

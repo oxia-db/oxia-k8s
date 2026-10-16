@@ -1,0 +1,16 @@
+# {{ ansible_managed }}
+[Unit]
+Description=oxia-etcd gateway
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=oxia
+Group=oxia
+ExecStart=/usr/local/bin/oxia-etcd --sconfig /etc/oxia-etcd/oxia-etcd.yaml
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

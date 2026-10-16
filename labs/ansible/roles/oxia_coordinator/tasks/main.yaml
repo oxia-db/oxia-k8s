@@ -1,0 +1,26 @@
+- name: Create the coordinator directory
+  ansible.builtin.file:
+    path: /var/lib/oxia/coordinator
+    state: directory
+    owner: oxia
+    group: oxia
+    mode: "0750"
+
+- name: Install the coordinator service
+  ansible.builtin.template:
+    src: oxia-coordinator.service.j2
+    dest: /etc/systemd/system/oxia-coordinator.service
+    mode: "0644"
+  notify: Restart Oxia
+
+- name: Start the coordinator
+  ansible.builtin.systemd_service:
+    name: oxia-coordinator
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Wait for the coordinator
+  ansible.builtin.wait_for:
+    port: "{{ oxia_coordinator_admin_port }}"
+    timeout: 120

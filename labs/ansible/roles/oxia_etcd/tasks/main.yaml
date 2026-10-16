@@ -1,0 +1,73 @@
+- name: Create the oxia user
+  ansible.builtin.user:
+    name: oxia
+    system: true
+    shell: /usr/sbin/nologin
+    home: /var/lib/oxia
+    create_home: false
+
+- name: Download the oxia-etcd release
+  when: oxia_etcd_binary | length == 0
+  block:
+    - name: Check the release
+      ansible.builtin.assert:
+        that: oxia_etcd_version | length > 0
+        fail_msg: Set oxia_etcd_version to a release of oxia-etcd, or oxia_etcd_binary to a binary on this machine
+
+    - name: Create the release directory
+      ansible.builtin.file:
+        path: /opt/oxia-etcd/{{ oxia_etcd_version }}
+        state: directory
+        mode: "0755"
+
+    - name: Unpack the release
+      ansible.builtin.unarchive:
+        src: https://github.com/oxia-db/oxia-etcd/releases/download/{{ oxia_etcd_version }}/oxia-etcd-linux-{{ oxia_arch }}.tar.gz
+        dest: /opt/oxia-etcd/{{ oxia_etcd_version }}
+        remote_src: true
+        creates: /opt/oxia-etcd/{{ oxia_etcd_version }}/oxia-etcd
+
+    - name: Install the release binary
+      ansible.builtin.copy:
+        src: /opt/oxia-etcd/{{ oxia_etcd_version }}/oxia-etcd
+        dest: /usr/local/bin/oxia-etcd
+        remote_src: true
+        mode: "0755"
+      notify: Restart the gateway
+
+- name: Install the local binary
+  when: oxia_etcd_binary | length > 0
+  ansible.builtin.copy:
+    src: "{{ oxia_etcd_binary }}"
+    dest: /usr/local/bin/oxia-etcd
+    mode: "0755"
+  notify: Restart the gateway
+
+- name: Create the configuration directory
+  ansible.builtin.file:
+    path: /etc/oxia-etcd
+    state: directory
+    mode: "0755"
+
+# The gateway reloads the log level and the progress interval when the file
+# changes, and the other settings when it restarts
+- name: Install the configuration
+  ansible.builtin.template:
+    src: oxia-etcd.yaml.j2
+    dest: /etc/oxia-etcd/oxia-etcd.yaml
+    mode: "0644"
+  notify: Restart the gateway
+
+- name: Install the gateway service
+  ansible.builtin.template:
+    src: oxia-etcd.service.j2
+    dest: /etc/systemd/system/oxia-etcd.service
+    mode: "0644"
+  notify: Restart the gateway
+
+- name: Start the gateway
+  ansible.builtin.systemd_service:
+    name: oxia-etcd
+    enabled: true
+    state: started
+    daemon_reload: true
