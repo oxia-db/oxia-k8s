@@ -1,0 +1,107 @@
+# Kubernetes (k3s) on Oxia: k3s keeps its state in Oxia, through the
+# oxia-etcd gateway. Oxia runs without Kubernetes: its coordinators keep
+# their metadata in Raft.
+name: oxia-k8s-k3s
+
+x-oxia: &oxia
+  image: ${OXIA_IMAGE:-oxia/oxia:nightly-beta}
+  restart: unless-stopped
+
+x-coordinator: &coordinator
+  <<: *oxia
+  entrypoint: ["sh", "-c"]
+  command:
+    - >-
+      exec oxia coordinator --metadata raft
+      --raft-address $${HOSTNAME}:6652
+      --raft-bootstrap-nodes coordinator-0:6652,coordinator-1:6652,coordinator-2:6652
+      --raft-data-dir /data/raft
+
+x-dataserver: &dataserver
+  <<: *oxia
+  command: ["oxia", "server", "--data-dir", "/data/db", "--wal-dir", "/data/wal"]
+
+x-gateway: &gateway
+  image: ${OXIA_ETCD_IMAGE:-oxia/oxia-etcd:nightly}
+  restart: unless-stopped
+  command: ["--sconfig", "/conf/oxia-etcd.yaml"]
+  volumes:
+    - ./oxia-etcd.yaml:/conf/oxia-etcd.yaml:ro
+  depends_on:
+    oxia-init:
+      condition: service_completed_successfully
+
+services:
+  coordinator-0:
+    <<: *coordinator
+    hostname: coordinator-0
+    volumes: ["coordinator-0:/data"]
+  coordinator-1:
+    <<: *coordinator
+    hostname: coordinator-1
+    volumes: ["coordinator-1:/data"]
+  coordinator-2:
+    <<: *coordinator
+    hostname: coordinator-2
+    volumes: ["coordinator-2:/data"]
+
+  dataserver-0:
+    <<: *dataserver
+    volumes: ["dataserver-0:/data"]
+  dataserver-1:
+    <<: *dataserver
+    volumes: ["dataserver-1:/data"]
+  dataserver-2:
+    <<: *dataserver
+    volumes: ["dataserver-2:/data"]
+
+  # Registers the data servers and the namespace with the coordinators, once
+  oxia-init:
+    image: ${OXIA_IMAGE:-oxia/oxia:nightly-beta}
+    entrypoint: ["sh", "/init.sh"]
+    volumes:
+      - ./oxia-init.sh:/init.sh:ro
+    depends_on: [coordinator-0, coordinator-1, coordinator-2, dataserver-0, dataserver-1, dataserver-2]
+
+  # Two gateways: one serves the records, the other stands by and takes over
+  oxia-etcd-0:
+    <<: *gateway
+  oxia-etcd-1:
+    <<: *gateway
+
+  k3s:
+    image: ${K3S_IMAGE:-rancher/k3s:v1.37.1-k3s1}
+    # A fixed name and address: the node keeps both across restarts
+    hostname: k3s-server
+    networks:
+      default:
+        ipv4_address: 172.30.0.100
+    privileged: true
+    restart: unless-stopped
+    command:
+      - server
+      - --datastore-endpoint=http://oxia-etcd-0:2379,http://oxia-etcd-1:2379
+      - --disable=traefik,metrics-server
+      - --tls-san=127.0.0.1
+    environment:
+      K3S_KUBECONFIG_OUTPUT: /output/kubeconfig.yaml
+      K3S_KUBECONFIG_MODE: "644"
+    tmpfs: ["/run", "/var/run"]
+    ports: ["6443:6443"]
+    volumes:
+      - ./output:/output
+    depends_on: [oxia-etcd-0, oxia-etcd-1]
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+
+volumes:
+  coordinator-0:
+  coordinator-1:
+  coordinator-2:
+  dataserver-0:
+  dataserver-1:
+  dataserver-2:
