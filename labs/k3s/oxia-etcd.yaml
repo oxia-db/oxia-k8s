@@ -1,0 +1,10 @@
+server:
+  bindAddress: 0.0.0.0:2379
+oxia:
+  serviceAddress: dataserver-0:6648
+  namespace: kubernetes
+  # The records of this Kubernetes cluster, in one Oxia shard
+  cluster: k3s
+observability:
+  metric:
+    bindAddress: 0.0.0.0:8080
