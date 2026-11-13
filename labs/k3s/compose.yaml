@@ -70,7 +70,7 @@ services:
     <<: *gateway
 
   k3s:
-    image: ${K3S_IMAGE:-rancher/k3s:v1.37.1-k3s1}
+    image: ${K3S_IMAGE:-rancher/k3s:v1.37.2-k3s1}
     # A fixed name and address: the node keeps both across restarts
     hostname: k3s-server
     networks:
